@@ -3,4 +3,10 @@ name = "synacor-challenge"
 version = "0.1.0"
 authors = ["Michael Auracher <michael.auracher@gmail.com>"]
 
-[dependencies]
+[[bin]]
+name = "synacor-challenge"
+path = "src/main.rs"
+
+[[bin]]
+name = "coin-solver"
+path = "src/coinsolver.rs"

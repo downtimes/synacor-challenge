@@ -357,6 +357,9 @@ fn main() {
                     regs[idx] = b % c;
                 }
             }
+            //TODO: I'm not sure if RMEM and WMEM never try to write addresses
+            //      of registers into memory or load register addresses from
+            //      memory. This is worth some debug investigations
             Op::RMEM(dest, b) => {
                 let from = constant_or_register_value(b, &regs);
                 if let Constant(val) = memory.read_address(from) {
