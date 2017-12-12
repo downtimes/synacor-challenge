@@ -6,7 +6,7 @@ const MATH_MODULO: u16 = 1 << 15;
 
 //TODO: Implement the from trait for this one so we don't have to 
 //write Value all the time.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Ord, PartialOrd)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Ord, PartialOrd, Hash)]
 pub struct U15(u16);
 
 impl fmt::Display for U15 {
@@ -22,7 +22,6 @@ impl U15 {
     }
 
     pub fn to_char(&self) -> char {
-        debug_assert!(self.0 < 255);
         self.0 as u8 as char
     }
 

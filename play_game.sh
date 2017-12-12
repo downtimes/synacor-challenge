@@ -2,9 +2,12 @@
 
 spawn cargo run --bin synacor-challenge
 
+#give ourselfs some time to attach the debugger
+sleep 10
+
 global expect_out
 set output ""                
-#		===== Foothills/Cave =====
+
 set inputs { "go doorway\r" 
 			 "go north\r"
 			 "go north\r"

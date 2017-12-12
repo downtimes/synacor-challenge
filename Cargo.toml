@@ -10,3 +10,7 @@ path = "src/main.rs"
 [[bin]]
 name = "coin-solver"
 path = "src/coinsolver.rs"
+
+[[bin]]
+name = "fun"
+path = "src/function.rs"

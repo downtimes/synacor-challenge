@@ -77,11 +77,13 @@ impl fmt::Display for Op {
             Op::RET => write!(f, "RET"),
             Op::OUT(a) => {
                 let repr = match a {
-                    WmWord::Constant(con) => { if con == U15::new(10) {
-                        ' '
-                    } else {
-                        con.to_char()
-                    }}
+                    WmWord::Constant(con) => { 
+                        if con == U15::new(10) {
+                            ' '
+                        } else {
+                            con.to_char()
+                        }
+                    }
                     WmWord::Register(_) => '?'
                 };
                 write!(f, "OUT {} {}", a, repr)
@@ -228,11 +230,12 @@ impl Memory {
     }
 }
 
-//TODO: This thing has self modifying code. Maybe we should write a
-//Frontend for inspecting it while running (Testing limn or elm)
+
 fn main() {
     use WmWord::*;
 
+    let mut trace_execution = false;
+    let mut trace_string = String::new();
     let mut pc = U15::new(0);
     let mut jump_address = None;
     let mut stack: Vec<U15> = Vec::new();
@@ -248,7 +251,21 @@ fn main() {
 
     loop {
         let (new_pc, op) = decode_and_fetch(pc, &memory);
+        //We are about to check for the correct value in the register
+        if pc == U15::new(5451) {
+            //Calculated value with  the program
+            regs[7] = U15::new(25734);
+            //Override the check if the register is correct with NOOP
+            //because we know it is
+            for add in 5483..5498 {
+                memory.write_address(U15::new(add), WmWord::Constant(U15::new(21)));
+            }
+        }
         let op = op.expect("We couldn't decode the instruction!");
+        if trace_execution {
+            trace_string.push_str(&op.to_string());
+            trace_string.push('\n');
+        }
         match op {
             Op::HALT => {
                 break;
@@ -357,9 +374,9 @@ fn main() {
                     regs[idx] = b % c;
                 }
             }
-            //TODO: I'm not sure if RMEM and WMEM never try to write addresses
-            //      of registers into memory or load register addresses from
-            //      memory. This is worth some debug investigations
+            // After thinking through it there is no possibilty to load or store 
+            // a value > 15 bit with this instruction. These instructions are
+            // constrained by the register size!
             Op::RMEM(dest, b) => {
                 let from = constant_or_register_value(b, &regs);
                 if let Constant(val) = memory.read_address(from) {
@@ -386,8 +403,21 @@ fn main() {
             //That's possible according to the arch-spec
             Op::IN(dest) => {
                 if input_string.is_empty() {
+                    //If we hit the next input request we stop tracing
+                    //An put the trace in a file
+                    if trace_execution {
+                        trace_execution = false;
+                        let mut file = File::create("trace").unwrap();
+                        file.write(trace_string.as_bytes()).unwrap();
+                        trace_string.clear();
+                    }
                     // memory.disassemble(Value(0), to_load.len() as u16, Path::new("dissasembly"));
                     std::io::stdin().read_line(&mut input_string).unwrap();
+                    
+                    //If we use the teleporter start tracing the execution
+                    // if input_string == "use teleporter\n" {
+                    //     trace_execution = true;
+                    // }
                     //reverse the string so we can easily pop on element after
                     //the other
                     input_string = input_string.chars().rev().collect();
