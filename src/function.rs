@@ -3,7 +3,7 @@ use u15::U15;
 use std::collections::HashMap;
 
 //NOTE: Not the fastest in the world but should on a reasonable machine
-//with optimaziations turned on take less than 10 min to find the result
+//with optimizations turned on take less than 10 min to find the result
 //r7 = 25734
 fn main() {
     let a = U15::new(4);

@@ -1,7 +1,7 @@
 #include <stack>
 #include <iostream>  
 
-//according to what i saw these values should be 4 and 1 at the start respectively
+//according to what I saw these values should be 4 and 1 at the start respectively
 //r7 is the one we modify and try to find a value != 0 so that a returns with 
 //6 in our mod 32768 based math
 int64_t a = 4;

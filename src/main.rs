@@ -12,6 +12,9 @@ const TEST_PROGRAM: &'static [u16] = &[9, 32768, 32769, 4, 19, 32768];
 
 const MAX_WM_WORD: u16 = 32775;
 
+const MEMORY_R7_CHECK_START: u16 = 5483;
+const MEMORY_R7_CHECK_END: u16 = 5498;
+
 #[derive(Debug, Clone, Copy)]
 enum WmWord {
     Constant(U15),
@@ -234,8 +237,6 @@ impl Memory {
 fn main() {
     use WmWord::*;
 
-    let mut trace_execution = false;
-    let mut trace_string = String::new();
     let mut pc = U15::new(0);
     let mut jump_address = None;
     let mut stack: Vec<U15> = Vec::new();
@@ -251,21 +252,7 @@ fn main() {
 
     loop {
         let (new_pc, op) = decode_and_fetch(pc, &memory);
-        //We are about to check for the correct value in the register
-        if pc == U15::new(5451) {
-            //Calculated value with  the program
-            regs[7] = U15::new(25734);
-            //Override the check if the register is correct with NOOP
-            //because we know it is
-            for add in 5483..5498 {
-                memory.write_address(U15::new(add), WmWord::Constant(U15::new(21)));
-            }
-        }
         let op = op.expect("We couldn't decode the instruction!");
-        if trace_execution {
-            trace_string.push_str(&op.to_string());
-            trace_string.push('\n');
-        }
         match op {
             Op::HALT => {
                 break;
@@ -403,17 +390,19 @@ fn main() {
             //That's possible according to the arch-spec
             Op::IN(dest) => {
                 if input_string.is_empty() {
-                    //If we hit the next input request we stop tracing
-                    //An put the trace in a file
-                    if trace_execution {
-                        trace_execution = false;
-                        let mut file = File::create("trace").unwrap();
-                        file.write(trace_string.as_bytes()).unwrap();
-                        trace_string.clear();
-                    }
-                    // memory.disassemble(Value(0), to_load.len() as u16, Path::new("dissasembly"));
                     std::io::stdin().read_line(&mut input_string).unwrap();
                     
+                    //Fixes the teleporter part of the code and sets r7 accordingly
+                    //when the "cheatcode" is entered
+                    if input_string == "fix teleporter\n" {
+                        //Calculated correct value with external program "fun"
+                        regs[7] = U15::new(25734);
+                        //Override the check if r7 is correct with NOOP
+                        //because we know it is
+                        for add in MEMORY_R7_CHECK_START..MEMORY_R7_CHECK_END {
+                            memory.write_address(U15::new(add), WmWord::Constant(U15::new(21)));
+                        }
+                    }
                     //If we use the teleporter start tracing the execution
                     // if input_string == "use teleporter\n" {
                     //     trace_execution = true;

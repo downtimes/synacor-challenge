@@ -3,7 +3,7 @@
 spawn cargo run --bin synacor-challenge
 
 #give ourselfs some time to attach the debugger
-sleep 10
+#sleep 10
 
 global expect_out
 set output ""                
@@ -57,7 +57,33 @@ set inputs { "go doorway\r"
 			 "use corroded coin\r"
 			 "go north\r"
 			 "take teleporter\r"
+			 "fix teleporter\r"
 			 "use teleporter\r"
+			 "go north\r"
+			 "go north\r"
+			 "go north\r"
+			 "go north\r"
+			 "go north\r"
+			 "go north\r"
+			 "go north\r"
+			 "go north\r"
+			 "go north\r"
+			 "take orb\r"
+			 "go north\r"
+			 "go east\r"
+			 "go east\r"
+			 "go north\r"
+			 "go west\r"
+			 "go south\r"
+			 "go east\r"
+			 "go east\r"
+			 "go west\r"
+			 "go north\r"
+			 "go north\r"
+			 "go east\r"
+			 "go vault\r"
+			 "take mirror\r"
+			 "use mirror\r"
 }
 
 foreach input $inputs {
