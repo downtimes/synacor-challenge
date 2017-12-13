@@ -29,14 +29,14 @@ fn solves_equation(perm: &[u32]) -> bool {
     perm[0] + perm[1] * perm[2].pow(2) + perm[3].pow(3) - perm[4] == 399
 }
 
-fn number_to_coin(num: u32) -> String {
+fn number_to_coin(num: u32) -> &'static str {
     match num {
-        2 => "red coin".to_owned(),
-        3 => "corroded coin".to_owned(),
-        5 => "shiny coin".to_owned(),
-        7 => "concave coin".to_owned(),
-        9 => "blue coin".to_owned(),
-        _ => "unknown coin".to_owned(),
+        2 => "red coin",
+        3 => "corroded coin",
+        5 => "shiny coin",
+        7 => "concave coin",
+        9 => "blue coin",
+        _ => "unknown coin",
     }
 }
 

@@ -3,6 +3,10 @@ name = "synacor-challenge"
 version = "0.1.0"
 authors = ["Michael Auracher <michael.auracher@gmail.com>"]
 
+[lib]
+name = "u15"
+path = "src/u15.rs"
+
 [[bin]]
 name = "synacor-challenge"
 path = "src/main.rs"
@@ -12,9 +16,9 @@ name = "coin-solver"
 path = "src/coinsolver.rs"
 
 [[bin]]
-name = "fun"
-path = "src/function.rs"
+name = "r7"
+path = "src/calcr7.rs"
 
 [[bin]]
-name = "brute"
-path = "src/brutemaze.rs"
+name = "maze"
+path = "src/mazesolver.rs"

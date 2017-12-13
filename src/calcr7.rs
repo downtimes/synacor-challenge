@@ -1,9 +1,11 @@
-mod u15;
+extern crate u15;
+
 use u15::U15;
 use std::collections::HashMap;
 
 //NOTE: Not the fastest in the world but should on a reasonable machine
-//with optimizations turned on take less than 10 min to find the result
+//with optimizations turned on take less than 10 min to find the result.
+//Without release compile this overflows the stack!
 //r7 = 25734
 fn main() {
     let a = U15::new(4);
@@ -15,7 +17,6 @@ fn main() {
     let mut res = ack(a, b, r7, &mut memory); 
     //Play with the register until we have the right input
     while res != U15::new(6) {
-        println!("Our test with r7={} resulted in: {}", r7, res);
         r7 = r7 + 1;
         memory.clear();
         res = ack(a, b, r7, &mut memory);

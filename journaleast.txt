@@ -84,7 +84,7 @@ Reconstruction of the grid:
 
  Brute force it: from a simple solution e e w e e n w s n n n s n s e n
  we know that we only can use < the amount of steps it took us wich was 16
+ because the houreglass said we are to late
 
  So we implement a backtracking algorithm wich tries all combinations 
- until we find one < 16. When we found one we count the steps and try to find
- an even shorter one until it's impossible to find one with the amounts of steps
+ up to the length 16 steps. We can then take the shortest one as a solution.

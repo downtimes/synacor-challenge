@@ -3,7 +3,7 @@ use std::path::Path;
 use std::fmt;
 use std::io::Write;
 
-mod u15;
+extern crate u15;
 use u15::U15;
 
 const BINARY_FILE: &'static [u8] = include_bytes!("../challenge.bin");
@@ -11,9 +11,11 @@ const BINARY_FILE: &'static [u8] = include_bytes!("../challenge.bin");
 const TEST_PROGRAM: &'static [u16] = &[9, 32768, 32769, 4, 19, 32768];
 
 const MAX_WM_WORD: u16 = 32775;
+const REGISTER_COUNT: usize = 8;
 
 const MEMORY_R7_CHECK_START: u16 = 5483;
 const MEMORY_R7_CHECK_END: u16 = 5498;
+
 
 #[derive(Debug, Clone, Copy)]
 enum WmWord {
@@ -80,14 +82,16 @@ impl fmt::Display for Op {
             Op::RET => write!(f, "RET"),
             Op::OUT(a) => {
                 let repr = match a {
-                    WmWord::Constant(con) => { 
+                    WmWord::Constant(con) => {
                         if con == U15::new(10) {
                             ' '
-                        } else {
+                        } else if con <= U15::new(std::u8::MAX as u16) {
                             con.to_char()
+                        } else {
+                            '�'
                         }
                     }
-                    WmWord::Register(_) => '?'
+                    WmWord::Register(_) => '®',
                 };
                 write!(f, "OUT {} {}", a, repr)
             }
@@ -101,7 +105,10 @@ impl fmt::Display for Op {
 fn constant_or_register_value(val: WmWord, regs: &[U15; 8]) -> U15 {
     match val {
         WmWord::Constant(con) => con,
-        WmWord::Register(idx) => regs[idx],
+        WmWord::Register(idx) => {
+            debug_assert!((idx as usize) < REGISTER_COUNT);
+            regs[idx]
+        }
     }
 }
 
@@ -119,7 +126,7 @@ fn decode_and_fetch(pc: U15, memory: &Memory) -> (U15, Option<Op>) {
                     0 => Op::HALT,
                     18 => Op::RET,
                     21 => Op::NOOP,
-                    _ => panic!("Coded some shit in match arm"),
+                    _ => unreachable!(),
                 };
                 res = (new_pc, Some(op));
             }
@@ -135,7 +142,7 @@ fn decode_and_fetch(pc: U15, memory: &Memory) -> (U15, Option<Op>) {
                     17 => Op::CALL(a),
                     19 => Op::OUT(a),
                     20 => Op::IN(a),
-                    _ => panic!("Coded some shit in match arm"),
+                    _ => unreachable!(),
                 };
                 res = (new_pc, Some(op));
             }
@@ -152,7 +159,7 @@ fn decode_and_fetch(pc: U15, memory: &Memory) -> (U15, Option<Op>) {
                     14 => Op::NOT(a, b),
                     15 => Op::RMEM(a, b),
                     16 => Op::WMEM(a, b),
-                    _ => panic!("Coded some shit in match arm"),
+                    _ => unreachable!(),
                 };
                 res = (new_pc, Some(op));
             }
@@ -171,14 +178,14 @@ fn decode_and_fetch(pc: U15, memory: &Memory) -> (U15, Option<Op>) {
                     11 => Op::MOD(a, b, c),
                     12 => Op::AND(a, b, c),
                     13 => Op::OR(a, b, c),
-                    _ => panic!("Coded some shit in match arm"),
+                    _ => unreachable!(),
                 };
                 res = (new_pc, Some(op));
             }
-            //Unknown op_code value; to support dissasembly we return None
+            //Unknown op_code value; to support dissasembly we do nothing here
             _ => {}
         }
-    } 
+    }
     res
 }
 
@@ -189,24 +196,28 @@ struct Memory {
 impl Memory {
     fn new() -> Memory {
         Memory {
-            memory: vec![WmWord::Constant(U15::new(0)); 32768]
+            memory: vec![WmWord::Constant(U15::new(0)); 32768],
         }
     }
 
     #[allow(dead_code)]
-    fn disassemble(&self, from: U15, length: u16, path: &Path) {
+    fn disassemble<P: AsRef<Path>>(&self, from: U15, length: u16, path: P) {
         let mut file = File::create(path).unwrap();
         let mut pc = from;
         let mut to_read = length;
         while to_read > 4 {
             let (new_pc, op) = decode_and_fetch(pc, self);
             to_read = to_read - (new_pc - pc).to_u16();
-            file.write(format!("{:05}: ", pc.to_u16()).as_bytes()).unwrap();
-            if let Some(op) = op {
-                file.write(op.to_string().as_bytes()).unwrap();
-            } else {
-                file.write(format!("{}", self.memory[pc.to_idx()]).as_bytes())
-                    .unwrap();
+            file.write(format!("{:05}: ", pc.to_u16()).as_bytes())
+                .unwrap();
+            match op {
+                Some(op) => {
+                    file.write(op.to_string().as_bytes()).unwrap();
+                }
+                None => {
+                    file.write(format!("{}", self.memory[pc.to_idx()]).as_bytes())
+                        .unwrap();
+                }
             }
             file.write(b"\n").unwrap();
             pc = new_pc;
@@ -218,7 +229,7 @@ impl Memory {
             let word = match *word {
                 0...u15::MAX => WmWord::Constant(U15::new(*word)),
                 u15::MAX...MAX_WM_WORD => WmWord::Register((word % (u15::MAX + 1)) as usize),
-                _ => panic!("Invalid number was found in the binary file")
+                _ => panic!("Invalid number was found in the binary file"),
             };
             self.memory[idx] = word;
         }
@@ -237,13 +248,14 @@ impl Memory {
 fn main() {
     use WmWord::*;
 
+    //Start our program at address 0
     let mut pc = U15::new(0);
-    let mut jump_address = None;
     let mut stack: Vec<U15> = Vec::new();
     let mut input_string = String::new();
     //Registers are named 0..7 and indexed as such
-    let mut regs = [U15::new(0); 8];
+    let mut regs = [U15::new(0); REGISTER_COUNT];
     let mut memory = Memory::new();
+    //Convert our binary file to the right byteorder and assemble the words
     let to_load: Vec<u16> = BINARY_FILE
         .chunks(2)
         .map(|chunk| ((chunk[1] as u16) << 8) + (chunk[0] as u16))
@@ -252,6 +264,7 @@ fn main() {
 
     loop {
         let (new_pc, op) = decode_and_fetch(pc, &memory);
+        pc = new_pc;
         let op = op.expect("We couldn't decode the instruction!");
         match op {
             Op::HALT => {
@@ -265,21 +278,18 @@ fn main() {
                 //Literally do nothing
             }
             Op::JMP(dest) => {
-                let val = constant_or_register_value(dest, &regs);
-                jump_address = Some(val);
+                pc = constant_or_register_value(dest, &regs);
             }
             Op::JT(cond, dest) => {
                 let cond = constant_or_register_value(cond, &regs);
                 if cond != U15::new(0) {
-                    let dest = constant_or_register_value(dest, &regs);
-                    jump_address = Some(dest);
+                    pc = constant_or_register_value(dest, &regs);
                 }
             }
             Op::JF(cond, dest) => {
                 let cond = constant_or_register_value(cond, &regs);
                 if cond == U15::new(0) {
-                    let dest = constant_or_register_value(dest, &regs);
-                    jump_address = Some(dest);
+                    pc = constant_or_register_value(dest, &regs);
                 }
             }
             Op::SET(dest, b) => {
@@ -302,7 +312,6 @@ fn main() {
                 if let Register(idx) = dest {
                     regs[idx] = set_value;
                 }
-
             }
             Op::PUSH(val) => {
                 let val = constant_or_register_value(val, &regs);
@@ -343,9 +352,8 @@ fn main() {
                 }
             }
             Op::CALL(dest) => {
-                let dest = constant_or_register_value(dest, &regs);
-                stack.push(new_pc);
-                jump_address = Some(dest);
+                stack.push(pc);
+                pc = constant_or_register_value(dest, &regs);
             }
             Op::MULT(dest, b, c) => {
                 let b = constant_or_register_value(b, &regs);
@@ -361,7 +369,7 @@ fn main() {
                     regs[idx] = b % c;
                 }
             }
-            // After thinking through it there is no possibilty to load or store 
+            // After thinking through it there is no possibilty to load or store
             // a value > 15 bit with this instruction. These instructions are
             // constrained by the register size!
             Op::RMEM(dest, b) => {
@@ -370,7 +378,7 @@ fn main() {
                     if let Register(idx) = dest {
                         regs[idx] = val;
                     }
-                 }
+                }
             }
             Op::WMEM(a, b) => {
                 let val = constant_or_register_value(b, &regs);
@@ -382,8 +390,7 @@ fn main() {
                 if stack.is_empty() {
                     break;
                 }
-                let val = stack.pop().unwrap();
-                jump_address = Some(val);
+                pc = stack.pop().unwrap(); //save since we break if empty
             }
             //Handle the input here, Just read the string once and than each
             //cycle we hit here we chomp away from our string.
@@ -391,11 +398,11 @@ fn main() {
             Op::IN(dest) => {
                 if input_string.is_empty() {
                     std::io::stdin().read_line(&mut input_string).unwrap();
-                    
+
                     //Fixes the teleporter part of the code and sets r7 accordingly
                     //when the "cheatcode" is entered
                     if input_string == "fix teleporter\n" {
-                        //Calculated correct value with external program "fun"
+                        //Calculated correct value with external program "r7"
                         regs[7] = U15::new(25734);
                         //Override the check if r7 is correct with NOOP
                         //because we know it is
@@ -403,11 +410,7 @@ fn main() {
                             memory.write_address(U15::new(add), WmWord::Constant(U15::new(21)));
                         }
                     }
-                    //If we use the teleporter start tracing the execution
-                    // if input_string == "use teleporter\n" {
-                    //     trace_execution = true;
-                    // }
-                    //reverse the string so we can easily pop on element after
+                    //reverse the string so we can easily pop one element after
                     //the other
                     input_string = input_string.chars().rev().collect();
                 }
@@ -416,11 +419,5 @@ fn main() {
                 }
             }
         }
-        pc = if let Some(jump) = jump_address {
-            jump_address = None;
-            jump
-        } else {
-            new_pc
-        };
     }
 }

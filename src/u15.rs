@@ -22,6 +22,7 @@ impl U15 {
     }
 
     pub fn to_char(&self) -> char {
+        debug_assert!(self.0 <= std::u8::MAX as u16);
         self.0 as u8 as char
     }
 
