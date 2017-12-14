@@ -1,3 +1,5 @@
+#![allow(unknown_lints)]
+
 use std::fs::File;
 use std::path::Path;
 use std::fmt;
