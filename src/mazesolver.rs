@@ -1,5 +1,5 @@
 //Found by experimentation
-const MAX_TRANSITIONS: u32 = 6;
+const MAX_TRANSITIONS: u32 = 8;
 
 const START: u32 = 0;
 const END: u32 = 7;
@@ -74,7 +74,7 @@ static TRANS_TABLE: [fn(i64) -> i64; 13] = [
     min8,       //11
     min1        //12
 ];
-    
+
 
 #[derive(Clone, Debug)]
 struct State {
@@ -85,6 +85,7 @@ struct State {
     trans: Vec<usize>,
 }
 
+//TODO: Search for bad error message https://play.rust-lang.org/?gist=8fc3d35987f091f3876ca8056e03a4b0&version=stable
 impl State {
     fn new() -> State {
         State {
@@ -99,83 +100,35 @@ impl State {
 
 //TODO: Really clean this one up
 fn main() {
-    let transitions = build_transitions(); 
+    let transitions = build_transitions();
     let state = State::new();
-    backtrack(state, &transitions);
+    let mut solutions = vec![];
+    backtrack(state, &transitions, &mut solutions);
+    println!(
+        "The shortest solution is:\n{:?}",
+        solutions.iter().min_by_key(|state| state.current_step)
+    )
 }
 
 //Stupid implementation because I gave up on closures and similar
 fn build_transitions() -> Transitions {
     let mut res = vec![];
-    let start = vec![
-        (1, 0),
-        (2, 1),
-        (2, 2),
-        (3, 1),
-    ];
+    let start = vec![(1, 0), (2, 1), (2, 2), (3, 1)];
     res.push(start);
-    let x1 = vec![
-        (1, 0),
-        (2, 2),
-        (4, 3),
-        (4, 4),
-    ];
+    let x1 = vec![(1, 0), (2, 2), (4, 3), (4, 4)];
     res.push(x1);
-    let x2 = vec![
-        (1, 0),
-        (2, 2),
-        (2, 1),
-        (2, 7),
-        (4, 4),
-        (5, 6),
-        (5, 5),
-        (6, 8),
-        (3, 1),
-        (3, 7),
-    ];
+    let x2 = vec![ (1, 0), (2, 2), (2, 1), (2, 7), (4, 4), (5, 6), (5, 5), 
+                   (6, 8), (3, 1), (3, 7)];
     res.push(x2);
-    let x3 = vec![
-        (2, 1),
-        (2, 7),
-        (5, 5),
-        (6, 8),
-        (3, 7),
-        (3, 1),
-    ];
+    let x3 = vec![(2, 1), (2, 7), (5, 5), (6, 8), (3, 7), (3, 1)];
     res.push(x3);
-    let x4 = vec![
-        (4, 3),
-        (4, 4),
-        (1, 10),
-        (2, 0),
-        (5, 6),
-        (5, 5),
-        (2, 2),
-        (END, 9),
-    ];
+    let x4 = vec![ (4, 3), (4, 4), (1, 10), (2, 0), (5, 6), (5, 5), (2, 2), 
+                   (END, 9)];
     res.push(x4);
-    let x5 = vec![
-        (5, 5),
-        (5, 6),
-        (1, 0),
-        (2, 2),
-        (2, 7),
-        (6, 8),
-        (6, 11),
-        (4, 3),
-        (4, 4),
-        (END, 9),
-        (END, 12),
-    ];
+    let x5 = vec![ (5, 5), (5, 6), (1, 0), (2, 2), (2, 7), (6, 8), (6, 11), 
+                   (4, 3), (4, 4), (END, 9), (END, 12)];
     res.push(x5);
-    let x6 = vec![
-        (6, 11),
-        (6, 8),
-        (3, 7),
-        (5, 5),
-        (5, 6),
-        (END, 12),
-    ];
+    let x6 = vec![(6, 11), (6, 8), (3, 7), (5, 5), (5, 6), (END, 12)];
     res.push(x6);
     let end = vec![];
     res.push(end);
@@ -183,46 +136,58 @@ fn build_transitions() -> Transitions {
 }
 
 //If we need results somehow differently do a &mut in here
-fn backtrack(state: State, transitions: &Transitions) {
+fn backtrack(state: State, transitions: &Transitions, sol: &mut Vec<State>) {
     if reject(&state) {
         return;
     }
     if accept(&state) {
-        println!("One solution: {:?}", state);
+        sol.push(state);
         return;
     }
     let pos_trans = &transitions[state.current_node as usize];
     //Try all the transitions one after another
     for trans in pos_trans {
-        let mut new_state = state.clone();
-        new_state.current_node = trans.0;
-        new_state.current_step = state.current_step + 1;
-        new_state.path.push(state.current_node);
-        new_state.trans.push(trans.1);
-        new_state.expression_number = TRANS_TABLE[trans.1](state.expression_number);
-        backtrack(new_state, transitions);
+        let new_state = next_possible(&state, *trans);
+        backtrack(new_state, transitions, sol);
+    }
+}
+
+fn next_possible(state: &State, (node, tbl_idx): (u32, usize)) -> State {
+    let mut new_path = state.path.clone();
+    new_path.push(node);
+    let mut new_trans = state.trans.clone();
+    new_trans.push(tbl_idx);
+    State {
+        current_node: node,
+        current_step: state.current_step + 1,
+        path: new_path,
+        trans: new_trans,
+        expression_number: TRANS_TABLE[tbl_idx](state.expression_number),
     }
 }
 
 fn accept(state: &State) -> bool {
-    state.current_node == END
-    && state.expression_number == TARGET_NUMBER 
-    && state.current_step <= MAX_TRANSITIONS
+    state.current_node == END && state.expression_number == TARGET_NUMBER
+        && state.current_step <= MAX_TRANSITIONS
 }
 
 fn reject(state: &State) -> bool {
-    //If our calculation gets negative we reject
+    //If our calculation goes negative we reject
     if state.expression_number < 0 {
-        return true
+        return true;
     }
-    //We have only one step left but we need at least two to make it to the end
-    if state.current_step == MAX_TRANSITIONS - 1 
-       && (state.current_node == 1 || state.current_node == 2 || state.current_node == 3) {
-        return true
+    //We have only one step left but we need at least two from these nodes
+    //to make it to the end
+    if state.current_step == MAX_TRANSITIONS - 1
+        && (state.current_node == 1 || state.current_node == 2 || state.current_node == 3)
+    {
+        return true;
     }
     //We have no more steps left and are not on the end
     if state.current_step == MAX_TRANSITIONS && state.current_node != END {
-        return true
+        return true;
     }
+
+    //We don't know yet if we can reject this state
     false
 }

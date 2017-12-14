@@ -6,11 +6,11 @@ use std::io::Write;
 extern crate u15;
 use u15::U15;
 
-const BINARY_FILE: &'static [u8] = include_bytes!("../challenge.bin");
+const BINARY_FILE: &[u8] = include_bytes!("../challenge.bin");
 #[allow(dead_code)]
-const TEST_PROGRAM: &'static [u16] = &[9, 32768, 32769, 4, 19, 32768];
+const TEST_PROGRAM: &[u16] = &[9, 32_768, 32_769, 4, 19, 32_768];
 
-const MAX_WM_WORD: u16 = 32775;
+const MAX_WM_WORD: u16 = 32_775;
 const REGISTER_COUNT: usize = 8;
 
 const MEMORY_R7_CHECK_START: u16 = 5483;
@@ -83,9 +83,9 @@ impl fmt::Display for Op {
             Op::OUT(a) => {
                 let repr = match a {
                     WmWord::Constant(con) => {
-                        if con == U15::new(10) {
+                        if con == U15::from(10) {
                             ' '
-                        } else if con <= U15::new(std::u8::MAX as u16) {
+                        } else if con <= U15::from(std::u8::MAX) {
                             con.to_char()
                         } else {
                             '�'
@@ -196,7 +196,7 @@ struct Memory {
 impl Memory {
     fn new() -> Memory {
         Memory {
-            memory: vec![WmWord::Constant(U15::new(0)); 32768],
+            memory: vec![WmWord::Constant(U15::from(0)); std::u16::MAX as usize],
         }
     }
 
@@ -207,27 +207,30 @@ impl Memory {
         let mut to_read = length;
         while to_read > 4 {
             let (new_pc, op) = decode_and_fetch(pc, self);
-            to_read = to_read - (new_pc - pc).to_u16();
-            file.write(format!("{:05}: ", pc.to_u16()).as_bytes())
-                .unwrap();
+            to_read -= (new_pc - pc).to_u16();
+            file.write_all(format!("{:05}: ", pc.to_u16()).as_bytes()).unwrap();
             match op {
                 Some(op) => {
-                    file.write(op.to_string().as_bytes()).unwrap();
+                    file.write_all(op.to_string().as_bytes()).unwrap();
                 }
                 None => {
-                    file.write(format!("{}", self.memory[pc.to_idx()]).as_bytes())
+                    file.write_all(format!("{}", self.memory[pc.to_idx()]).as_bytes())
                         .unwrap();
                 }
             }
-            file.write(b"\n").unwrap();
+            file.write_all(b"\n").unwrap();
             pc = new_pc;
         }
     }
 
+    #[allow(match_overlapping_arm)]
     fn load(&mut self, program: &[u16]) {
         for (idx, word) in program.iter().enumerate() {
             let word = match *word {
-                0...u15::MAX => WmWord::Constant(U15::new(*word)),
+                0...u15::MAX => WmWord::Constant(U15::from(*word)),
+                //Overlapping ranges here because u15::MAX + 1 is not a constant
+                //And can not be used as a match pattern. It's no problem though
+                //because u15::MAX get's correctly handled by the previous arm
                 u15::MAX...MAX_WM_WORD => WmWord::Register((word % (u15::MAX + 1)) as usize),
                 _ => panic!("Invalid number was found in the binary file"),
             };
@@ -249,16 +252,16 @@ fn main() {
     use WmWord::*;
 
     //Start our program at address 0
-    let mut pc = U15::new(0);
+    let mut pc = U15::from(0);
     let mut stack: Vec<U15> = Vec::new();
     let mut input_string = String::new();
     //Registers are named 0..7 and indexed as such
-    let mut regs = [U15::new(0); REGISTER_COUNT];
+    let mut regs = [U15::from(0); REGISTER_COUNT];
     let mut memory = Memory::new();
     //Convert our binary file to the right byteorder and assemble the words
     let to_load: Vec<u16> = BINARY_FILE
         .chunks(2)
-        .map(|chunk| ((chunk[1] as u16) << 8) + (chunk[0] as u16))
+        .map(|chunk| (u16::from(chunk[1]) << 8) + u16::from(chunk[0]))
         .collect();
     memory.load(&to_load);
 
@@ -282,13 +285,13 @@ fn main() {
             }
             Op::JT(cond, dest) => {
                 let cond = constant_or_register_value(cond, &regs);
-                if cond != U15::new(0) {
+                if cond != U15::from(0) {
                     pc = constant_or_register_value(dest, &regs);
                 }
             }
             Op::JF(cond, dest) => {
                 let cond = constant_or_register_value(cond, &regs);
-                if cond == U15::new(0) {
+                if cond == U15::from(0) {
                     pc = constant_or_register_value(dest, &regs);
                 }
             }
@@ -308,7 +311,7 @@ fn main() {
             Op::EQ(dest, b, c) => {
                 let b = constant_or_register_value(b, &regs);
                 let c = constant_or_register_value(c, &regs);
-                let set_value = if b == c { U15::new(1) } else { U15::new(0) };
+                let set_value = if b == c { U15::from(1) } else { U15::from(0) };
                 if let Register(idx) = dest {
                     regs[idx] = set_value;
                 }
@@ -326,7 +329,7 @@ fn main() {
             Op::GT(dest, b, c) => {
                 let b = constant_or_register_value(b, &regs);
                 let c = constant_or_register_value(c, &regs);
-                let set_value = if b > c { U15::new(1) } else { U15::new(0) };
+                let set_value = if b > c { U15::from(1) } else { U15::from(0) };
                 if let Register(idx) = dest {
                     regs[idx] = set_value;
                 }
@@ -403,11 +406,11 @@ fn main() {
                     //when the "cheatcode" is entered
                     if input_string == "fix teleporter\n" {
                         //Calculated correct value with external program "r7"
-                        regs[7] = U15::new(25734);
+                        regs[7] = U15::from(25_734);
                         //Override the check if r7 is correct with NOOP
                         //because we know it is
                         for add in MEMORY_R7_CHECK_START..MEMORY_R7_CHECK_END {
-                            memory.write_address(U15::new(add), WmWord::Constant(U15::new(21)));
+                            memory.write_address(U15::from(add), WmWord::Constant(U15::from(21)));
                         }
                     }
                     //reverse the string so we can easily pop one element after
@@ -415,7 +418,7 @@ fn main() {
                     input_string = input_string.chars().rev().collect();
                 }
                 if let Register(idx) = dest {
-                    regs[idx] = U15::new(input_string.pop().unwrap() as u16);
+                    regs[idx] = U15::from(input_string.pop().unwrap() as u16);
                 }
             }
         }
